@@ -1,0 +1,386 @@
+openapi: 3.0.3
+info:
+  title: CarZ - Multi-tenant Garage & Vehicle Management API
+  version: 1.2.0
+  description: API REST para gerenciamento multi-tenant de garagens, veículos, peças, custos, vendas e integração com a Tabela FIPE (Parallelum API).
+
+paths:
+  # =========================================================================
+  # INTEGRAÇÃO TABELA FIPE (PARALLELUM API PROXY)
+  # =========================================================================
+  /api/v1/fipe/marcas:
+    get:
+      summary: Listar todas as marcas de carros da Tabela FIPE (com cache)
+      responses:
+        "200":
+          description: Lista de marcas retornada com sucesso
+
+  /api/v1/fipe/marcas/{marcaId}/modelos:
+    get:
+      summary: Listar modelos de uma marca FIPE
+      parameters:
+        - name: marcaId
+          in: path
+          required: true
+          schema: { type: string, example: "56" }
+      responses:
+        "200":
+          description: Lista de modelos da marca
+
+  /api/v1/fipe/marcas/{marcaId}/modelos/{modeloId}/anos:
+    get:
+      summary: Listar anos disponíveis para um modelo FIPE
+      parameters:
+        - name: marcaId
+          in: path
+          required: true
+          schema: { type: string, example: "56" }
+        - name: modeloId
+          in: path
+          required: true
+          schema: { type: string, example: "4921" }
+      responses:
+        "200":
+          description: Lista de anos/combustíveis disponíveis
+
+  /api/v1/fipe/marcas/{marcaId}/modelos/{modeloId}/anos/{anoId}:
+    get:
+      summary: Consultar valor de mercado e detalhes oficiais FIPE
+      parameters:
+        - name: marcaId
+          in: path
+          required: true
+          schema: { type: string, example: "56" }
+        - name: modeloId
+          in: path
+          required: true
+          schema: { type: string, example: "4921" }
+        - name: anoId
+          in: path
+          required: true
+          schema: { type: string, example: "2022-1" }
+      responses:
+        "200":
+          description: Dados consolidados e valor em Reais da FIPE
+
+  # =========================================================================
+  # GARAGENS (TENANTS) & MEMBROS
+  # =========================================================================
+  /api/v1/garages:
+    get:
+      summary: Listar todas as garagens que o usuário autenticado participa
+      responses:
+        "200":
+          description: Lista de garagens com o papel (role) do usuário em cada uma
+    post:
+      summary: Criar uma nova garagem (o criador torna-se OWNER)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name: { type: string, example: "Alpha Motors" }
+                slug: { type: string, example: "alpha-motors" }
+                document_cnpj_cpf: { type: string, example: "12.345.678/0001-90" }
+                phone: { type: string, example: "(11) 98888-7777" }
+                city: { type: string, example: "São Paulo" }
+                state: { type: string, example: "SP" }
+      responses:
+        "201":
+          description: Garagem criada com sucesso
+
+  /api/v1/garages/{garageId}/members:
+    get:
+      summary: Listar membros e seus papéis na garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lista de membros da garagem
+    post:
+      summary: Convidar novo membro para a garagem por e-mail
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              properties:
+                email: { type: string, format: email, example: "vendedor@exemplo.com" }
+                role: { type: string, enum: [ADMIN, GERENTE, VENDEDOR, MECANICO, ESTOQUISTA, VIEWER], example: "VENDEDOR" }
+      responses:
+        "201":
+          description: Convite enviado com sucesso
+
+  /api/v1/invites/{token}/accept:
+    post:
+      summary: Aceitar convite para ingressar em uma garagem
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Convite aceito e usuário adicionado aos membros da garagem
+
+  # =========================================================================
+  # VEÍCULOS (ISOLADOS POR GARAGEM)
+  # =========================================================================
+  /api/v1/garages/{garageId}/vehicles:
+    get:
+      summary: Listar veículos do pátio da garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [PREPARACAO, A_VENDA, VENDIDO] }
+        - name: search
+          in: query
+          description: Busca por placa, modelo ou chassi
+          schema: { type: string }
+      responses:
+        "200":
+          description: Lista de veículos da garagem
+
+    post:
+      summary: Cadastrar nova entrada de veículo na garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plate, brand, model, year_model, acquisition_price, acquisition_date]
+              properties:
+                plate: { type: string, example: "BRA2E19" }
+                vin: { type: string, example: "9BWZZZ377VT004251" }
+                renavam: { type: string, example: "12345678901" }
+                brand: { type: string, example: "Toyota" }
+                model: { type: string, example: "Corolla" }
+                version: { type: string, example: "XEi 2.0 Flex" }
+                fipe_code: { type: string, example: "002167-9" }
+                fipe_price_at_acquisition: { type: number, example: 115820.00 }
+                year_manufacture: { type: integer, example: 2021 }
+                year_model: { type: integer, example: 2022 }
+                color: { type: string, example: "Prata" }
+                mileage_in: { type: integer, example: 45000 }
+                acquisition_type: { type: string, example: "COMPRA_DIRETA_PF" }
+                acquisition_price: { type: number, example: 95000.00 }
+                acquisition_date: { type: string, format: date, example: "2026-08-30" }
+                target_sale_price: { type: number, example: 112000.00 }
+      responses:
+        "201":
+          description: Veículo cadastrado na garagem
+
+  /api/v1/garages/{garageId}/vehicles/{id}:
+    get:
+      summary: Obter detalhes do veículo (incluindo custo acumulado e histórico)
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Detalhes do veículo e demonstrativo de custos
+
+  # =========================================================================
+  # PEÇAS & ESTOQUE (ISOLADOS POR GARAGEM)
+  # =========================================================================
+  /api/v1/garages/{garageId}/parts:
+    get:
+      summary: Listar catálogo e saldo de peças da garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lista de peças da garagem
+    post:
+      summary: Cadastrar nova peça no catálogo da garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sku, name, average_cost_price]
+              properties:
+                sku: { type: string, example: "FREIO-COR-01" }
+                name: { type: string, example: "Pastilha de Freio Dianteira" }
+                category: { type: string, example: "Freios" }
+                min_stock_alert: { type: integer, example: 2 }
+                average_cost_price: { type: number, example: 120.00 }
+      responses:
+        "201":
+          description: Peça cadastrada
+
+  /api/v1/garages/{garageId}/parts/movements:
+    post:
+      summary: Registrar movimentação de peça (Entrada por compra ou Aplicação em veículo)
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [part_id, movement_type, quantity, unit_cost]
+              properties:
+                part_id: { type: string, format: uuid }
+                movement_type: { type: string, enum: [ENTRADA_COMPRA, SAIDA_APLICACAO_VEICULO, AJUSTE_INVENTARIO] }
+                quantity: { type: integer, example: 1 }
+                unit_cost: { type: number, example: 120.00 }
+                vehicle_id: { type: string, format: uuid }
+                notes: { type: string }
+      responses:
+        "201":
+          description: Movimentação registrada e custo alocado ao veículo
+
+  # =========================================================================
+  # GASTOS E CUSTOS (ISOLADOS POR GARAGEM)
+  # =========================================================================
+  /api/v1/garages/{garageId}/expenses/vehicle:
+    post:
+      summary: Lançar gasto direto em um veículo da garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicle_id, category, description, amount, expense_date]
+              properties:
+                vehicle_id: { type: string, format: uuid }
+                category: { type: string, example: "FUNILARIA_PINTURA" }
+                description: { type: string, example: "Pintura do parachoque dianteiro" }
+                amount: { type: number, example: 450.00 }
+                expense_date: { type: string, format: date }
+      responses:
+        "201":
+          description: Despesa agregada ao custo do veículo
+
+  /api/v1/garages/{garageId}/expenses/general:
+    get:
+      summary: Listar despesas gerais/fixas da garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Lista de despesas fixas
+    post:
+      summary: Cadastrar despesa geral/fixa da garagem (aluguel, luz, marketing)
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [category, description, amount, due_date]
+              properties:
+                category: { type: string, example: "MARKETING_ANUNCIOS" }
+                description: { type: string, example: "Mensalidade Webmotors" }
+                amount: { type: number, example: 1800.00 }
+                due_date: { type: string, format: date }
+                is_recurring: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Despesa cadastrada
+
+  # =========================================================================
+  # VENDAS E DASHBOARD
+  # =========================================================================
+  /api/v1/garages/{garageId}/sales:
+    post:
+      summary: Registrar venda de veículo com apuração de lucro e Trade-in
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vehicle_id, customer_id, final_sale_price, sale_date, payment_method]
+              properties:
+                vehicle_id: { type: string, format: uuid }
+                customer_id: { type: string, format: uuid }
+                final_sale_price: { type: number, example: 110000.00 }
+                sale_date: { type: string, format: date }
+                payment_method: { type: string, example: "MISTO" }
+                trade_in_vehicle:
+                  type: object
+                  nullable: true
+                  properties:
+                    plate: { type: string, example: "RIO2A18" }
+                    brand: { type: string, example: "Chevrolet" }
+                    model: { type: string, example: "Onix" }
+                    year_model: { type: integer, example: 2019 }
+                    agreed_trade_value: { type: number, example: 30000.00 }
+      responses:
+        "201":
+          description: Venda finalizada com sucesso
+
+  /api/v1/garages/{garageId}/dashboard/metrics:
+    get:
+      summary: Obter métricas consolidadas e DRE da garagem
+      parameters:
+        - name: garageId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Resumo executivo financeiro e operacional da garagem

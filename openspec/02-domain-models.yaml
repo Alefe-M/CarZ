@@ -1,0 +1,260 @@
+# CarZ - OpenSpec: 02. Modelos de Domínio e Estrutura de Entidades (Multi-tenant)
+version: "1.2.0"
+description: "Definição de entidades, relacionamentos e tipos para o sistema multi-tenant CarZ com 3 etapas de veículo"
+
+enums:
+  GarageRole:
+    description: "Papel do usuário dentro de uma garagem específica"
+    values:
+      - OWNER       # Dono da garagem / Acesso total + gestão de membros
+      - ADMIN       # Administrador delegado
+      - GERENTE     # Gestor de compras, vendas e custos
+      - VENDEDOR    # Acesso a estoque e registro de vendas
+      - MECANICO    # Acesso a preparação e requisição de peças
+      - ESTOQUISTA  # Gestão de inventário e compras de peças
+      - VIEWER      # Visualizador / Contador (somente leitura)
+
+  InviteStatus:
+    values: [PENDENTE, ACEITO, RECUSADO, EXPIRADO]
+
+  VehicleStatus:
+    description: "As 3 etapas fundamentais do ciclo de vida do veículo"
+    values:
+      - PREPARACAO   # 1ª Etapa: Manutenção, peças, funilaria, revisão e limpeza
+      - A_VENDA      # 2ª Etapa: Veículo no pátio, anunciado e disponível para clientes
+      - VENDIDO      # 3ª Etapa: Venda concretizada, faturado e entregue
+
+  VehicleAcquisitionType:
+    values: [COMPRA_DIRETA_PF, COMPRA_DIRETA_PJ, LEILAO, TROCA_TRADE_IN, CONSIGNADO]
+
+  FuelType:
+    values: [FLEX, GASOLINA, ETANOL, DIESEL, HIBRIDO, ELETRICO, GNV]
+
+  TransmissionType:
+    values: [MANUAL, AUTOMATICO, AUTOMATIZADO, CVT]
+
+  PartMovementType:
+    values: [ENTRADA_COMPRA, SAIDA_APLICACAO_VEICULO, SAIDA_AVULSA_VENDA, AJUSTE_INVENTARIO_POSITIVO, AJUSTE_INVENTARIO_NEGATIVO]
+
+  ExpenseCategory:
+    values: [PECA_ESTOQUE, PECA_COMPRA_DIRETA, SERVICO_MECANICO, FUNILARIA_PINTURA, ESTETICA_HIGIENIZACAO, DOCUMENTACAO_TAXAS, LAUDO_VISTORIA, TRANSPORTE_GUINCHO, OUTRO_DIRETO]
+
+  GeneralExpenseCategory:
+    values: [ALUGUEL_CONDOMINIO, ENERGIA_AGUA_INTERNET, MARKETING_ANUNCIOS, SALARIOS_PRO_LABORE, COMISSOES_GERAIS, FERRAMENTAS_EQUIPAMENTOS, SOFTWARES_SISTEMAS, IMPOSTOS_TAXAS_EMPRESARIAIS, CONTABILIDADE_JURIDICO, MANUTENCAO_PREDIO_LOJA, OUTRO_GERAL]
+
+  PaymentMethod:
+    values: [A_VISTA_PIX, A_VISTA_TED, FINANCIAMENTO, CARTAO_CREDITO, CARTA_CONSORCIO, VEICULO_TROCA, MISTO]
+
+  PaymentStatus:
+    values: [PENDENTE, PAGO, CANCELADO, REEMBOLSADO]
+
+entities:
+  User:
+    description: "Conta global do usuário no sistema"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      name: { type: "string" }
+      email: { type: "string", unique: true }
+      password_hash: { type: "string" }
+      phone: { type: "string", nullable: true }
+      avatar_url: { type: "string", nullable: true }
+      is_active: { type: "boolean", default: true }
+      created_at: { type: "timestamp" }
+
+  Garage:
+    description: "Tenant / Garagem / Loja de Veículos"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      name: { type: "string", description: "Nome Fantasia da Garagem" }
+      slug: { type: "string", unique: true, description: "Identificador amigável para URL" }
+      document_cnpj_cpf: { type: "string", nullable: true }
+      phone: { type: "string", nullable: true }
+      email: { type: "string", nullable: true }
+      address: { type: "string", nullable: true }
+      city: { type: "string", nullable: true }
+      state: { type: "string(2)", nullable: true }
+      logo_url: { type: "string", nullable: true }
+      created_at: { type: "timestamp" }
+      updated_at: { type: "timestamp" }
+
+  GarageMember:
+    description: "Vínculo de pertinência e permissão entre um Usuário e uma Garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      user_id: { type: "uuid", foreignKey: "User.id" }
+      role: { type: "GarageRole", default: "VENDEDOR" }
+      joined_at: { type: "timestamp" }
+    constraints:
+      - unique: ["garage_id", "user_id"]
+
+  GarageInvite:
+    description: "Convite para novos membros entrarem em uma garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      email: { type: "string" }
+      role: { type: "GarageRole" }
+      status: { type: "InviteStatus", default: "PENDENTE" }
+      invited_by_user_id: { type: "uuid", foreignKey: "User.id" }
+      token: { type: "string", unique: true }
+      expires_at: { type: "timestamp" }
+      created_at: { type: "timestamp" }
+
+  Vehicle:
+    description: "Veículo pertencente a uma garagem específica"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      plate: { type: "string(7)", description: "Placa Mercosul ou antiga" }
+      vin: { type: "string(17)", description: "Chassi do veículo" }
+      renavam: { type: "string(11)", description: "Renavam" }
+      brand: { type: "string" }
+      model: { type: "string" }
+      version: { type: "string", nullable: true }
+      year_manufacture: { type: "integer" }
+      year_model: { type: "integer" }
+      color: { type: "string" }
+      fuel_type: { type: "FuelType" }
+      transmission: { type: "TransmissionType" }
+      mileage_in: { type: "integer" }
+      mileage_current: { type: "integer" }
+      status: { type: "VehicleStatus", default: "PREPARACAO", description: "PREPARACAO, A_VENDA ou VENDIDO" }
+      acquisition_type: { type: "VehicleAcquisitionType" }
+      acquisition_date: { type: "date" }
+      acquisition_price: { type: "decimal(12,2)" }
+      fipe_price_at_acquisition: { type: "decimal(12,2)", nullable: true }
+      target_sale_price: { type: "decimal(12,2)", nullable: true }
+      minimum_sale_price: { type: "decimal(12,2)", nullable: true }
+      supplier_id: { type: "uuid", nullable: true, foreignKey: "Supplier.id" }
+      notes: { type: "text", nullable: true }
+      created_at: { type: "timestamp" }
+      updated_at: { type: "timestamp" }
+    constraints:
+      - unique: ["garage_id", "plate"]
+      - unique: ["garage_id", "vin"]
+
+  Part:
+    description: "Item de estoque pertencente a uma garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      sku: { type: "string" }
+      oem_code: { type: "string", nullable: true }
+      name: { type: "string" }
+      category: { type: "string" }
+      unit: { type: "string", default: "UN" }
+      current_stock: { type: "integer", default: 0 }
+      min_stock_alert: { type: "integer", default: 2 }
+      average_cost_price: { type: "decimal(12,2)" }
+      default_sale_price: { type: "decimal(12,2)", nullable: true }
+      location: { type: "string", nullable: true }
+      supplier_id: { type: "uuid", nullable: true, foreignKey: "Supplier.id" }
+      created_at: { type: "timestamp" }
+      updated_at: { type: "timestamp" }
+    constraints:
+      - unique: ["garage_id", "sku"]
+
+  PartStockMovement:
+    description: "Movimentação de peças dentro da garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      part_id: { type: "uuid", foreignKey: "Part.id" }
+      movement_type: { type: "PartMovementType" }
+      quantity: { type: "integer" }
+      unit_cost: { type: "decimal(12,2)" }
+      total_cost: { type: "decimal(12,2)" }
+      vehicle_id: { type: "uuid", nullable: true, foreignKey: "Vehicle.id" }
+      movement_date: { type: "timestamp" }
+      performed_by_user_id: { type: "uuid", foreignKey: "User.id" }
+      invoice_number: { type: "string", nullable: true }
+      notes: { type: "text", nullable: true }
+
+  VehicleExpense:
+    description: "Gasto direto vinculado a um veículo na garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      vehicle_id: { type: "uuid", foreignKey: "Vehicle.id" }
+      category: { type: "ExpenseCategory" }
+      description: { type: "string" }
+      amount: { type: "decimal(12,2)" }
+      expense_date: { type: "date" }
+      payment_status: { type: "PaymentStatus", default: "PAGO" }
+      supplier_id: { type: "uuid", nullable: true, foreignKey: "Supplier.id" }
+      part_movement_id: { type: "uuid", nullable: true, foreignKey: "PartStockMovement.id" }
+      receipt_file_url: { type: "string", nullable: true }
+      created_by_user_id: { type: "uuid", foreignKey: "User.id" }
+      created_at: { type: "timestamp" }
+
+  GeneralExpense:
+    description: "Despesas gerais/operacionais da garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      category: { type: "GeneralExpenseCategory" }
+      description: { type: "string" }
+      amount: { type: "decimal(12,2)" }
+      due_date: { type: "date" }
+      payment_date: { type: "date", nullable: true }
+      payment_status: { type: "PaymentStatus", default: "PENDENTE" }
+      is_recurring: { type: "boolean", default: false }
+      recurrence_period: { type: "string", nullable: true }
+      supplier_id: { type: "uuid", nullable: true, foreignKey: "Supplier.id" }
+      document_number: { type: "string", nullable: true }
+      notes: { type: "text", nullable: true }
+      created_at: { type: "timestamp" }
+
+  SaleTransaction:
+    description: "Venda de veículo realizada na garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      vehicle_id: { type: "uuid", unique: true, foreignKey: "Vehicle.id" }
+      customer_id: { type: "uuid", foreignKey: "Customer.id" }
+      seller_user_id: { type: "uuid", foreignKey: "User.id" }
+      sale_date: { type: "date" }
+      final_sale_price: { type: "decimal(12,2)" }
+      payment_method: { type: "PaymentMethod" }
+      cash_amount: { type: "decimal(12,2)", default: 0 }
+      financed_amount: { type: "decimal(12,2)", default: 0 }
+      trade_in_vehicle_id: { type: "uuid", nullable: true, foreignKey: "Vehicle.id" }
+      trade_in_value: { type: "decimal(12,2)", default: 0 }
+      sales_commission_amount: { type: "decimal(12,2)", default: 0 }
+      tax_amount: { type: "decimal(12,2)", default: 0 }
+      other_deductions: { type: "decimal(12,2)", default: 0 }
+      total_accumulated_cost: { type: "decimal(12,2)" }
+      gross_profit: { type: "decimal(12,2)" }
+      net_profit: { type: "decimal(12,2)" }
+      notes: { type: "text", nullable: true }
+      created_at: { type: "timestamp" }
+
+  Customer:
+    description: "Clientes cadastrados por uma garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      name: { type: "string" }
+      document_cpf_cnpj: { type: "string" }
+      email: { type: "string", nullable: true }
+      phone: { type: "string" }
+      address: { type: "string", nullable: true }
+      city: { type: "string", nullable: true }
+      state: { type: "string(2)", nullable: true }
+      created_at: { type: "timestamp" }
+    constraints:
+      - unique: ["garage_id", "document_cpf_cnpj"]
+
+  Supplier:
+    description: "Fornecedores cadastrados por uma garagem"
+    properties:
+      id: { type: "uuid", primaryKey: true }
+      garage_id: { type: "uuid", foreignKey: "Garage.id" }
+      trade_name: { type: "string" }
+      legal_name: { type: "string", nullable: true }
+      document_cnpj_cpf: { type: "string", nullable: true }
+      contact_phone: { type: "string" }
+      email: { type: "string", nullable: true }
+      category: { type: "string", nullable: true }
+      created_at: { type: "timestamp" }
