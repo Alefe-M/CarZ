@@ -1,7 +1,11 @@
 import prisma from "../prisma";
 import { CreateVehicleInput } from "../validations/vehicle.schema";
 import { VehicleStatus } from "@prisma/client";
-import { calculateDirectCost, calculateFipeDiscount } from "../calculations";
+import {
+  calculateDirectCost,
+  calculateVehicleCostBreakdown,
+  calculateFipeDiscount,
+} from "../calculations";
 import Decimal from "decimal.js";
 
 export class VehicleService {
@@ -42,9 +46,8 @@ export class VehicleService {
       },
     });
 
-    // Enriquece cada veículo com seu custo acumulado calculado em tempo real
     return vehicles.map((vehicle) => {
-      const totalCost = calculateDirectCost(
+      const breakdown = calculateVehicleCostBreakdown(
         vehicle.acquisitionPrice,
         vehicle.expenses
       );
@@ -55,7 +58,10 @@ export class VehicleService {
 
       return {
         ...vehicle,
-        totalAccumulatedCost: totalCost,
+        breakdown,
+        totalAccumulatedCost: breakdown.totalAccumulatedCost,
+        totalPartsCost: breakdown.totalPartsCost,
+        totalLaborCost: breakdown.totalLaborCost,
         fipeDiscountPercentage: fipeDiscount,
         expenseCount: vehicle.expenses.length,
       };
@@ -63,7 +69,7 @@ export class VehicleService {
   }
 
   /**
-   * 2. Obtém a ficha técnica completa e dossiê financeiro do veículo
+   * 2. Obtém a ficha técnica completa e dossiê financeiro do veículo com detalhamento de peças e serviços
    */
   static async getVehicleById(garageId: string, vehicleId: string) {
     const vehicle = await prisma.vehicle.findFirst({
@@ -78,13 +84,6 @@ export class VehicleService {
             supplier: true,
           },
           orderBy: { expenseDate: "desc" },
-        },
-        stockMovements: {
-          include: {
-            part: true,
-            performedByUser: { select: { id: true, name: true } },
-          },
-          orderBy: { movementDate: "desc" },
         },
         sale: {
           include: {
@@ -101,7 +100,7 @@ export class VehicleService {
       throw new Error("Veículo não encontrado nesta garagem.");
     }
 
-    const totalCost = calculateDirectCost(
+    const breakdown = calculateVehicleCostBreakdown(
       vehicle.acquisitionPrice,
       vehicle.expenses
     );
@@ -110,7 +109,7 @@ export class VehicleService {
       ? calculateFipeDiscount(vehicle.acquisitionPrice, vehicle.fipePriceAtAcquisition)
       : null;
 
-    // Resumo de despesas por categoria
+    // Resumo de despesas agrupado por categoria
     const expensesByCategory = vehicle.expenses.reduce((acc, exp) => {
       const cat = exp.category;
       acc[cat] = (acc[cat] || 0) + new Decimal(exp.amount).toNumber();
@@ -119,7 +118,11 @@ export class VehicleService {
 
     return {
       ...vehicle,
-      totalAccumulatedCost: totalCost,
+      breakdown,
+      totalAccumulatedCost: breakdown.totalAccumulatedCost,
+      totalPartsCost: breakdown.totalPartsCost,
+      totalLaborCost: breakdown.totalLaborCost,
+      totalOtherCost: breakdown.totalOtherCost,
       fipeDiscountPercentage: fipeDiscount,
       expensesByCategory,
     };
@@ -156,7 +159,7 @@ export class VehicleService {
         transmission: input.transmission,
         mileageIn: input.mileageIn,
         mileageCurrent: input.mileageIn,
-        status: VehicleStatus.PREPARACAO, // 1ª etapa: sempre inicia em PREPARACAO
+        status: VehicleStatus.PREPARACAO,
         acquisitionType: input.acquisitionType,
         acquisitionDate: new Date(input.acquisitionDate),
         acquisitionPrice: new Decimal(input.acquisitionPrice),
@@ -203,4 +206,3 @@ export class VehicleService {
     });
   }
 }
-

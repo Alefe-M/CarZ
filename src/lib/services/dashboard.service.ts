@@ -5,10 +5,10 @@ import Decimal from "decimal.js";
 
 export class DashboardService {
   /**
-   * Retorna os KPIs executivos, pipeline das 3 etapas e DRE simplificado da garagem ativa
+   * Retorna os KPIs executivos, pipeline das 3 etapas, totais de peças e serviços aplicados e DRE simplificado
    */
   static async getMetrics(garageId: string) {
-    // 1. Veículos por etapa
+    // 1. Veículos por etapa e custos agregados
     const vehicles = await prisma.vehicle.findMany({
       where: { garageId },
       include: { expenses: true },
@@ -19,9 +19,16 @@ export class DashboardService {
     let countVendido = 0;
     let totalInvestedInStock = new Decimal(0);
     let totalPreparacaoCost = new Decimal(0);
+    let totalPartsSpent = new Decimal(0);
+    let totalLaborSpent = new Decimal(0);
 
     for (const v of vehicles) {
       const cost = calculateDirectCost(v.acquisitionPrice, v.expenses);
+
+      for (const exp of v.expenses) {
+        totalPartsSpent = totalPartsSpent.plus(exp.partsCost || 0);
+        totalLaborSpent = totalLaborSpent.plus(exp.laborCost || 0);
+      }
 
       if (v.status === VehicleStatus.PREPARACAO) {
         countPreparacao++;
@@ -54,7 +61,7 @@ export class DashboardService {
       totalCommissions = totalCommissions.plus(s.salesCommissionAmount);
     }
 
-    // 3. Despesas Gerais da Garagem
+    // 3. Despesas Gerais da Garagem (Fixas)
     const generalExpenses = await prisma.generalExpense.findMany({
       where: { garageId },
     });
@@ -69,22 +76,6 @@ export class DashboardService {
       .minus(totalGeneralExpenses)
       .minus(totalCommissions);
 
-    // 4. Peças com Estoque Crítico
-    const lowStockParts = await prisma.part.findMany({
-      where: {
-        garageId,
-        currentStock: { lte: prisma.part.fields.minStockAlert },
-      },
-      select: {
-        id: true,
-        name: true,
-        sku: true,
-        currentStock: true,
-        minStockAlert: true,
-        unit: true,
-      },
-    });
-
     return {
       pipeline: {
         preparacao: countPreparacao,
@@ -96,6 +87,11 @@ export class DashboardService {
         totalInvestedInStock: totalInvestedInStock.toDecimalPlaces(2).toNumber(),
         totalPreparacaoCost: totalPreparacaoCost.toDecimalPlaces(2).toNumber(),
       },
+      maintenanceSummary: {
+        totalPartsSpent: totalPartsSpent.toDecimalPlaces(2).toNumber(),
+        totalLaborSpent: totalLaborSpent.toDecimalPlaces(2).toNumber(),
+        totalMaintenance: totalPartsSpent.plus(totalLaborSpent).toDecimalPlaces(2).toNumber(),
+      },
       dre: {
         totalRevenue: totalRevenue.toDecimalPlaces(2).toNumber(),
         totalCMV: totalCMV.toDecimalPlaces(2).toNumber(),
@@ -104,9 +100,6 @@ export class DashboardService {
         totalGeneralExpenses: totalGeneralExpenses.toDecimalPlaces(2).toNumber(),
         operatingResult: operatingResult.toDecimalPlaces(2).toNumber(),
       },
-      lowStockPartsCount: lowStockParts.length,
-      lowStockParts,
     };
   }
 }
-

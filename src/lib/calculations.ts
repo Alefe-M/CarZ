@@ -1,10 +1,21 @@
 import Decimal from "decimal.js";
 
-// Configuração padrão de precisão decimal para finanças: 2 casas decimais com arredondamento padrão
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
-export interface DirectExpenseInput {
+export interface DirectExpenseItem {
   amount: number | string | Decimal;
+  partsCost?: number | string | Decimal;
+  laborCost?: number | string | Decimal;
+  category?: string;
+}
+
+export interface VehicleCostBreakdown {
+  acquisitionPrice: number;
+  totalPartsCost: number;
+  totalLaborCost: number;
+  totalOtherCost: number;
+  totalExpensesCost: number;
+  totalAccumulatedCost: number;
 }
 
 export interface ProfitAndMarginsResult {
@@ -15,12 +26,12 @@ export interface ProfitAndMarginsResult {
 }
 
 /**
- * 1. Calcula o Custo Direto Acumulado do Veículo:
- * C_direto = Preço de Aquisição + Soma de todos os gastos diretos (peças, serviços, taxas)
+ * 1. Calcula o Custo Direto Acumulado Total do Veículo:
+ * C_direto = Preço de Aquisição + Soma de todas as despesas (Peças + Mão de Obra + Taxas)
  */
 export function calculateDirectCost(
   acquisitionPrice: number | string | Decimal,
-  expenses: DirectExpenseInput[] = []
+  expenses: DirectExpenseItem[] = []
 ): number {
   let total = new Decimal(acquisitionPrice || 0);
 
@@ -32,31 +43,44 @@ export function calculateDirectCost(
 }
 
 /**
- * 2. Calcula o Custo Médio Ponderado de Peças em Estoque:
- * C_medio = ((Qtd_atual * Custo_medio_atual) + (Qtd_nova * Custo_novo)) / (Qtd_atual + Qtd_nova)
+ * 2. Detalha o Dossiê de Gastos do Veículo (Total de Peças, Total de Mão de Obra/Serviço e Outros)
  */
-export function calculateWeightedAveragePartCost(
-  currentStock: number,
-  currentAverageCost: number | string | Decimal,
-  incomingQuantity: number,
-  incomingUnitCost: number | string | Decimal
-): number {
-  const currentQty = new Decimal(Math.max(0, currentStock));
-  const currentCost = new Decimal(currentAverageCost || 0);
-  const newQty = new Decimal(Math.max(0, incomingQuantity));
-  const newCost = new Decimal(incomingUnitCost || 0);
+export function calculateVehicleCostBreakdown(
+  acquisitionPrice: number | string | Decimal,
+  expenses: DirectExpenseItem[] = []
+): VehicleCostBreakdown {
+  const acq = new Decimal(acquisitionPrice || 0);
+  let totalParts = new Decimal(0);
+  let totalLabor = new Decimal(0);
+  let totalOther = new Decimal(0);
+  let totalExp = new Decimal(0);
 
-  const totalQuantity = currentQty.plus(newQty);
+  for (const exp of expenses) {
+    const pCost = new Decimal(exp.partsCost || 0);
+    const lCost = new Decimal(exp.laborCost || 0);
+    const totalAmount = new Decimal(exp.amount || 0);
 
-  if (totalQuantity.isZero()) {
-    return newCost.toDecimalPlaces(2).toNumber();
+    totalParts = totalParts.plus(pCost);
+    totalLabor = totalLabor.plus(lCost);
+    totalExp = totalExp.plus(totalAmount);
+
+    // Se o gasto não tiver detalhamento de peças nem mão de obra (ex: IPVA/Laudo), entra como outros
+    const remainder = totalAmount.minus(pCost).minus(lCost);
+    if (remainder.greaterThan(0)) {
+      totalOther = totalOther.plus(remainder);
+    }
   }
 
-  const currentTotalValue = currentQty.times(currentCost);
-  const incomingTotalValue = newQty.times(newCost);
-  const totalValue = currentTotalValue.plus(incomingTotalValue);
+  const totalAccumulated = acq.plus(totalExp);
 
-  return totalValue.dividedBy(totalQuantity).toDecimalPlaces(2).toNumber();
+  return {
+    acquisitionPrice: acq.toDecimalPlaces(2).toNumber(),
+    totalPartsCost: totalParts.toDecimalPlaces(2).toNumber(),
+    totalLaborCost: totalLabor.toDecimalPlaces(2).toNumber(),
+    totalOtherCost: totalOther.toDecimalPlaces(2).toNumber(),
+    totalExpensesCost: totalExp.toDecimalPlaces(2).toNumber(),
+    totalAccumulatedCost: totalAccumulated.toDecimalPlaces(2).toNumber(),
+  };
 }
 
 /**
@@ -147,4 +171,3 @@ export function formatCurrencyBRL(value: number | string | Decimal): string {
     currency: "BRL",
   }).format(num);
 }
-

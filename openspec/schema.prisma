@@ -1,5 +1,5 @@
 // CarZ - Prisma Database Schema for PostgreSQL
-// OpenSpec: 07. Multi-tenant Database Schema Specification
+// OpenSpec: 07. Multi-tenant Database Schema Specification (Gastos Diretos com Peças e Serviços por Veículo)
 
 generator client {
   provider = "prisma-client-js"
@@ -19,8 +19,7 @@ enum GarageRole {
   ADMIN       // Administrador delegado
   GERENTE     // Gestor de compras, vendas e pátio
   VENDEDOR    // Consulta estoque e registra propostas/vendas
-  MECANICO    // Solicita peças e registra serviços
-  ESTOQUISTA  // Gerencia almoxarifado e compras de peças
+  MECANICO    // Registra serviços e peças aplicadas
   VIEWER      // Somente leitura (auditor/contador)
 }
 
@@ -62,23 +61,13 @@ enum TransmissionType {
   CVT
 }
 
-enum PartMovementType {
-  ENTRADA_COMPRA
-  SAIDA_APLICACAO_VEICULO
-  SAIDA_AVULSA_VENDA
-  AJUSTE_INVENTARIO_POSITIVO
-  AJUSTE_INVENTARIO_NEGATIVO
-}
-
 enum ExpenseCategory {
-  PECA_ESTOQUE
-  PECA_COMPRA_DIRETA
-  SERVICO_MECANICO
-  FUNILARIA_PINTURA
-  ESTETICA_HIGIENIZACAO
-  DOCUMENTACAO_TAXAS
-  LAUDO_VISTORIA
-  TRANSPORTE_GUINCHO
+  MANUTENCAO_MECANICA       // Troca de peças + mão de obra mecânica
+  FUNILARIA_PINTURA         // Lanternagem, pintura, martelinho
+  ESTETICA_HIGIENIZACAO     // Lavagem detalhada, polimento, higienização
+  DOCUMENTACAO_TAXAS        // IPVA, licenciamento, transferência, despachante
+  LAUDO_VISTORIA            // Cautelar, perícia, vistoria
+  TRANSPORTE_GUINCHO        // Frete, guincho, combustível
   OUTRO_DIRETO
 }
 
@@ -131,7 +120,6 @@ model User {
   memberships   GarageMember[]
   sentInvites   GarageInvite[]
 
-  stockMovements PartStockMovement[]
   vehicleExpenses VehicleExpense[]
   sales          SaleTransaction[]
 
@@ -156,8 +144,6 @@ model Garage {
   invites         GarageInvite[]
 
   vehicles        Vehicle[]
-  parts           Part[]
-  stockMovements  PartStockMovement[]
   vehicleExpenses VehicleExpense[]
   generalExpenses GeneralExpense[]
   sales           SaleTransaction[]
@@ -239,7 +225,6 @@ model Supplier {
   updatedAt       DateTime        @updatedAt
 
   vehicles        Vehicle[]
-  parts           Part[]
   vehicleExpenses VehicleExpense[]
   generalExpenses GeneralExpense[]
 
@@ -269,10 +254,10 @@ model Vehicle {
   acquisitionDate         DateTime                @db.Date
   acquisitionPrice        Decimal                 @db.Decimal(12, 2)
   
-  // Integração com Tabela FIPE (Parallelum API)
-  fipeCode                String?                 @db.VarChar(10) // ex: "002167-9"
+  // Integração com Tabela FIPE
+  fipeCode                String?                 @db.VarChar(10)
   fipePriceAtAcquisition  Decimal?                @db.Decimal(12, 2)
-  fipeReferenceMonth      String?                 @db.VarChar(30) // ex: "agosto de 2026"
+  fipeReferenceMonth      String?                 @db.VarChar(30)
   
   targetSalePrice         Decimal?                @db.Decimal(12, 2)
   minimumSalePrice        Decimal?                @db.Decimal(12, 2)
@@ -284,7 +269,6 @@ model Vehicle {
   supplier                Supplier?               @relation(fields: [supplierId], references: [id])
 
   expenses                VehicleExpense[]
-  stockMovements          PartStockMovement[]
   sale                    SaleTransaction?
 
   tradeInFromSaleId       String?                 @unique
@@ -296,60 +280,6 @@ model Vehicle {
   @@map("vehicles")
 }
 
-model Part {
-  id                String          @id @default(uuid())
-  garageId          String
-  garage            Garage          @relation(fields: [garageId], references: [id], onDelete: Cascade)
-  sku               String
-  oemCode           String?
-  name              String
-  category          String
-  unit              String          @default("UN") @db.VarChar(10)
-  currentStock      Int             @default(0)
-  minStockAlert     Int             @default(2)
-  averageCostPrice  Decimal         @db.Decimal(12, 2)
-  defaultSalePrice  Decimal?        @db.Decimal(12, 2)
-  location          String?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-
-  supplierId        String?
-  supplier          Supplier?       @relation(fields: [supplierId], references: [id])
-
-  movements         PartStockMovement[]
-
-  @@unique([garageId, sku])
-  @@index([garageId])
-  @@map("parts")
-}
-
-model PartStockMovement {
-  id                  String            @id @default(uuid())
-  garageId            String
-  garage              Garage            @relation(fields: [garageId], references: [id], onDelete: Cascade)
-  partId              String
-  part                Part              @relation(fields: [partId], references: [id])
-  movementType        PartMovementType
-  quantity            Int
-  unitCost            Decimal           @db.Decimal(12, 2)
-  totalCost           Decimal           @db.Decimal(12, 2)
-  movementDate        DateTime          @default(now())
-  invoiceNumber       String?
-  notes               String?           @db.Text
-
-  vehicleId           String?
-  vehicle             Vehicle?          @relation(fields: [vehicleId], references: [id])
-
-  performedByUserId   String
-  performedByUser     User              @relation(fields: [performedByUserId], references: [id])
-
-  vehicleExpense      VehicleExpense?
-
-  @@index([garageId])
-  @@index([partId])
-  @@map("part_stock_movements")
-}
-
 model VehicleExpense {
   id                  String            @id @default(uuid())
   garageId            String
@@ -358,17 +288,20 @@ model VehicleExpense {
   vehicle             Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   category            ExpenseCategory
   description         String
-  amount              Decimal           @db.Decimal(12, 2)
+  
+  // Detalhamento de Peça vs Mão de Obra / Serviço:
+  partsCost           Decimal           @default(0) @db.Decimal(12, 2) // Valor das Peças (ex: R$ 20,00)
+  laborCost           Decimal           @default(0) @db.Decimal(12, 2) // Valor da Mão de Obra/Serviço (ex: R$ 50,00)
+  amount              Decimal           @db.Decimal(12, 2)             // Total (ex: R$ 70,00)
+  
   expenseDate         DateTime          @db.Date
   paymentStatus       PaymentStatus     @default(PAGO)
   receiptFileUrl      String?
+  notes               String?           @db.Text
   createdAt           DateTime          @default(now())
 
   supplierId          String?
   supplier            Supplier?         @relation(fields: [supplierId], references: [id])
-
-  partMovementId      String?           @unique
-  partMovement        PartStockMovement? @relation(fields: [partMovementId], references: [id])
 
   createdByUserId     String
   createdByUser       User              @relation(fields: [createdByUserId], references: [id])

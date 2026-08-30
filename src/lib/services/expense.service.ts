@@ -7,7 +7,7 @@ import Decimal from "decimal.js";
 
 export class ExpenseService {
   /**
-   * 1. Lança um gasto direto específico em um veículo (funilaria, mecânica, laudo, etc.)
+   * 1. Lança um gasto direto no veículo (detalhando peças e mão de obra/serviço)
    */
   static async createVehicleExpense(
     garageId: string,
@@ -22,17 +22,24 @@ export class ExpenseService {
       throw new Error("Veículo não encontrado nesta garagem.");
     }
 
+    const partsCost = new Decimal(input.partsCost || 0);
+    const laborCost = new Decimal(input.laborCost || 0);
+    const totalAmount = new Decimal(input.amount || partsCost.plus(laborCost));
+
     return prisma.vehicleExpense.create({
       data: {
         garageId,
         vehicleId: vehicle.id,
         category: input.category,
         description: input.description,
-        amount: new Decimal(input.amount),
+        partsCost,
+        laborCost,
+        amount: totalAmount,
         expenseDate: new Date(input.expenseDate),
         paymentStatus: input.paymentStatus,
         supplierId: input.supplierId,
         receiptFileUrl: input.receiptFileUrl,
+        notes: input.notes,
         createdByUserId: userId,
       },
     });
@@ -64,7 +71,7 @@ export class ExpenseService {
   }
 
   /**
-   * 3. Lista as despesas gerais da garagem com filtros
+   * 3. Lista as despesas gerais da garagem
    */
   static async listGeneralExpenses(garageId: string) {
     return prisma.generalExpense.findMany({
@@ -76,4 +83,3 @@ export class ExpenseService {
     });
   }
 }
-

@@ -7,7 +7,6 @@ export const ROLE_HIERARCHY: Record<GarageRole, number> = {
   GERENTE: 60,
   VENDEDOR: 40,
   MECANICO: 30,
-  ESTOQUISTA: 30,
   VIEWER: 10,
 };
 
