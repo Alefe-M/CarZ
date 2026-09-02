@@ -6,6 +6,15 @@ Este documento contém os prompts atualizados para gerar o design de interface d
 
 ## 🎨 Design System & Diretrizes Visuais
 
+* **Projeto Stitch Criado:** `CarZ - Automotive Management Platform` (ID: `17949472866757951159`)
+* **Design System Ativo:** `CarZ Precision Management` (ID: `assets/daf1759fc74246739a4329c4c6cf1a9f`)
+* **Telas Geradas no Stitch:**
+  1. **Dashboard Executivo (Desktop 1440px):** Screen ID `afb906a0e70042db8a08decc74142c6f`
+  2. **Dossiê Financeiro do Veículo (Peças x Mão de Obra):** Screen ID `a0c48bc10ed64c918a8fd938eba4a58a`
+  3. **App Mobile / PWA (Mobile 390px):** Screen ID `e0a9fe6b6ade4f13ab6ab054283ae609`
+  4. **Nova Entrada de Veículo com Auto-lookup FIPE:** Screen ID `26daeb06856b491dbf4bc2936267b3bb`
+  5. **Logo Oficial CarZ:** Screen ID `3915322f50354fa58fb92eb29197a43f`
+
 * **Estilo:** SaaS B2B automotivo moderno, limpo, alta densidade de informação estilo Linear / Vercel / shadcn/ui.
 * **Paleta de Cores:**
   * **Dark Mode:** Fundo escuro `#09090B` / `#18181B` com cards em zinc suave.

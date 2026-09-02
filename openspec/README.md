@@ -14,6 +14,7 @@ Bem-vindo à especificação técnica e de negócio do **CarZ**, sistema web mul
 | [04-workflows.md](./04-workflows.md) | Diagramas de fluxo e máquinas de estado (Ciclo em 3 Etapas, Aplicação de Peças e Venda com Trade-in). |
 | [05-api-spec.yaml](./05-api-spec.yaml) | Contrato OpenAPI 3.0 (Swagger) para a API REST multi-tenant e endpoints de proxy FIPE. |
 | [06-technical-architecture.md](./06-technical-architecture.md) | Arquitetura técnica: Next.js (App Router), React, TypeScript, PostgreSQL, Tenant Context Switcher, Tailwind CSS e shadcn/ui. |
+| [07-frontend-process.md](./07-frontend-process.md) | Especificação detalhada do **Processo Frontend**, Design System, Pipeline Kanban de 3 Etapas e Dossiê Financeiro com Peça x Mão de Obra. |
 | [schema.prisma](./schema.prisma) | Modelagem pronta do Prisma ORM para PostgreSQL com precisão monetária `Decimal(12,2)`, campos FIPE e integridade referencial multi-tenant. |
 | [08-fipe-integration.md](./08-fipe-integration.md) | Especificação completa da integração com a **FipeAPI / Parallelum API** (Marcas, Modelos, Anos, Valores de mercado e Caching). |
 | [09-ui-design-prompts-stitch.md](./09-ui-design-prompts-stitch.md) | Guia completo de **Prompts para o Stitch** (Web Desktop 1440px e Mobile 390px) cobrindo todas as telas e fluxos. |
