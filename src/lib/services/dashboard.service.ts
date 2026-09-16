@@ -7,7 +7,9 @@ export class DashboardService {
   /**
    * Retorna os KPIs executivos, pipeline das 3 etapas, totais de peças e serviços aplicados e DRE simplificado
    */
-  static async getMetrics(garageId: string) {
+  static async getMetrics(garageId: string, referenceDate = new Date()) {
+    const periodStart = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+    const periodEnd = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 1);
     // 1. Veículos por etapa e custos agregados
     const vehicles = await prisma.vehicle.findMany({
       where: { garageId },
@@ -44,7 +46,10 @@ export class DashboardService {
 
     // 2. Vendas e DRE consolidado
     const sales = await prisma.saleTransaction.findMany({
-      where: { garageId },
+      where: {
+        garageId,
+        saleDate: { gte: periodStart, lt: periodEnd },
+      },
     });
 
     let totalRevenue = new Decimal(0);
@@ -52,6 +57,8 @@ export class DashboardService {
     let totalGrossProfit = new Decimal(0);
     let totalNetProfit = new Decimal(0);
     let totalCommissions = new Decimal(0);
+    let totalTaxes = new Decimal(0);
+    let totalOtherDeductions = new Decimal(0);
 
     for (const s of sales) {
       totalRevenue = totalRevenue.plus(s.finalSalePrice);
@@ -59,11 +66,16 @@ export class DashboardService {
       totalGrossProfit = totalGrossProfit.plus(s.grossProfit);
       totalNetProfit = totalNetProfit.plus(s.netProfit);
       totalCommissions = totalCommissions.plus(s.salesCommissionAmount);
+      totalTaxes = totalTaxes.plus(s.taxAmount);
+      totalOtherDeductions = totalOtherDeductions.plus(s.otherDeductions);
     }
 
     // 3. Despesas Gerais da Garagem (Fixas)
     const generalExpenses = await prisma.generalExpense.findMany({
-      where: { garageId },
+      where: {
+        garageId,
+        dueDate: { gte: periodStart, lt: periodEnd },
+      },
     });
 
     let totalGeneralExpenses = new Decimal(0);
@@ -71,10 +83,9 @@ export class DashboardService {
       totalGeneralExpenses = totalGeneralExpenses.plus(ge.amount);
     }
 
-    // Resultado Operacional Final = Lucro Bruto - Despesas Gerais - Comissões
-    const operatingResult = totalGrossProfit
-      .minus(totalGeneralExpenses)
-      .minus(totalCommissions);
+    // Resultado operacional = lucro líquido das vendas - despesas gerais do período.
+    // netProfit já desconta comissão, impostos e outras deduções por venda.
+    const operatingResult = totalNetProfit.minus(totalGeneralExpenses);
 
     return {
       pipeline: {
@@ -97,6 +108,8 @@ export class DashboardService {
         totalCMV: totalCMV.toDecimalPlaces(2).toNumber(),
         totalGrossProfit: totalGrossProfit.toDecimalPlaces(2).toNumber(),
         totalCommissions: totalCommissions.toDecimalPlaces(2).toNumber(),
+        totalTaxes: totalTaxes.toDecimalPlaces(2).toNumber(),
+        totalOtherDeductions: totalOtherDeductions.toDecimalPlaces(2).toNumber(),
         totalGeneralExpenses: totalGeneralExpenses.toDecimalPlaces(2).toNumber(),
         operatingResult: operatingResult.toDecimalPlaces(2).toNumber(),
       },

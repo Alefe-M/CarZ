@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { VehicleService } from "@/lib/services/vehicle.service";
 import { UpdateVehicleStatusSchema } from "@/lib/validations/vehicle.schema";
+import { authorizeGarageRequest, errorStatus } from "@/lib/authorization";
+import { GarageRole } from "@prisma/client";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { garageId: string; id: string } }
 ) {
   try {
+    await authorizeGarageRequest(request, params.garageId, GarageRole.GERENTE);
     const body = await request.json();
     const validatedData = UpdateVehicleStatusSchema.parse(body);
 
@@ -21,7 +24,7 @@ export async function PATCH(
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao atualizar status do veículo", details: error.errors },
-      { status: 400 }
+      { status: errorStatus(error) }
     );
   }
 }

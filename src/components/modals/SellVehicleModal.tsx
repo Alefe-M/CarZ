@@ -23,7 +23,7 @@ export function SellVehicleModal({
 }: SellVehicleModalProps) {
   const { vehicles, sellVehicle } = useGarage();
 
-  const forSaleVehicles = vehicles.filter((v) => v.status !== "VENDIDO");
+  const forSaleVehicles = vehicles.filter((v) => v.status === "A_VENDA");
   const [selectedVehicleId, setSelectedVehicleId] = useState(
     defaultVehicleId || forSaleVehicles[0]?.id || ""
   );
@@ -37,6 +37,8 @@ export function SellVehicleModal({
   const targetVehicle = vehicles.find((v) => v.id === selectedVehicleId);
 
   const [customerName, setCustomerName] = useState("");
+  const [customerDocument, setCustomerDocument] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [finalSalePrice, setFinalSalePrice] = useState<number | "">(
     targetVehicle?.targetSalePrice || ""
   );
@@ -64,14 +66,16 @@ export function SellVehicleModal({
   const netProfit = grossProfit - commNum;
   const grossMargin = saleNum > 0 ? (grossProfit / saleNum) * 100 : 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedVehicleId || !customerName || saleNum <= 0) return;
+    if (!selectedVehicleId || !customerName || !customerDocument || !customerPhone || saleNum <= 0) return;
 
     setSubmitting(true);
     try {
-      sellVehicle(selectedVehicleId, {
+      await sellVehicle(selectedVehicleId, {
         customerName,
+        customerDocument,
+        customerPhone,
         finalSalePrice: saleNum,
         paymentMethod,
         salesCommission: commNum,
@@ -143,6 +147,16 @@ export function SellVehicleModal({
               required
               className="text-xs"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-zinc-300 block mb-1">CPF/CNPJ do Cliente</label>
+            <Input placeholder="Somente números ou formatado" value={customerDocument} onChange={(e) => setCustomerDocument(e.target.value)} required className="text-xs" />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-zinc-300 block mb-1">Telefone do Cliente</label>
+            <Input placeholder="(11) 99999-9999" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required className="text-xs" />
           </div>
 
           <div>
@@ -336,7 +350,7 @@ export function SellVehicleModal({
           <Button
             type="submit"
             size="sm"
-            disabled={submitting || saleNum <= 0 || !customerName}
+            disabled={submitting || saleNum <= 0 || !customerName || !customerDocument || !customerPhone}
             className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
           >
             {submitting ? "Finalizando..." : "Confirmar Venda"}

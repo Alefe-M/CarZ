@@ -21,11 +21,11 @@ export default function GeneralExpensesPage() {
 
   const totalExpenses = generalExpenses.reduce((acc, ge) => acc + ge.amount, 0);
 
-  const handleAddExpense = (e: React.FormEvent) => {
+  const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description || !amount || Number(amount) <= 0) return;
 
-    addGeneralExpense({
+    await addGeneralExpense({
       category,
       description,
       amount: Number(amount),

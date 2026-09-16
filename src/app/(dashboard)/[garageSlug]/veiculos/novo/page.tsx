@@ -21,7 +21,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 
-// Mock FIPE data for instantaneous offline / resilient lookup
+// Kept only as type-compatible legacy examples; the form loads FIPE data via the proxy below.
 const POPULAR_BRANDS = [
   { codigo: "56", nome: "Toyota" },
   { codigo: "25", nome: "Honda" },
@@ -95,16 +95,19 @@ export default function NewVehiclePage() {
   const { garage, addVehicle } = useGarage();
 
   // FIPE Cascade State
-  const [selectedBrandCode, setSelectedBrandCode] = useState("56");
-  const [selectedModelCode, setSelectedModelCode] = useState("4921");
-  const [selectedYearCode, setSelectedYearCode] = useState("2022-1");
+  const [selectedBrandCode, setSelectedBrandCode] = useState("");
+  const [selectedModelCode, setSelectedModelCode] = useState("");
+  const [selectedYearCode, setSelectedYearCode] = useState("");
+  const [brands, setBrands] = useState<Array<{ codigo: string; nome: string }>>([]);
+  const [models, setModels] = useState<Array<{ codigo: string | number; nome: string }>>([]);
+  const [years, setYears] = useState<Array<{ codigo: string; nome: string }>>([]);
 
   // Form Fields
-  const [brandName, setBrandName] = useState("Toyota");
-  const [modelName, setModelName] = useState("Corolla");
-  const [versionName, setVersionName] = useState("XEi 2.0 Flex 16V Aut.");
-  const [yearManufacture, setYearManufacture] = useState(2021);
-  const [yearModel, setYearModel] = useState(2022);
+  const [brandName, setBrandName] = useState("");
+  const [modelName, setModelName] = useState("");
+  const [versionName, setVersionName] = useState("");
+  const [yearManufacture, setYearManufacture] = useState(new Date().getFullYear());
+  const [yearModel, setYearModel] = useState(new Date().getFullYear());
   const [plate, setPlate] = useState("");
   const [vin, setVin] = useState("");
   const [renavam, setRenavam] = useState("");
@@ -112,8 +115,8 @@ export default function NewVehiclePage() {
   const [mileage, setMileage] = useState<number | "">("");
 
   // FIPE Data
-  const [fipePrice, setFipePrice] = useState(115820);
-  const [fipeCode, setFipeCode] = useState("002167-9");
+  const [fipePrice, setFipePrice] = useState(0);
+  const [fipeCode, setFipeCode] = useState("");
 
   // Acquisition Financials
   const [acquisitionType, setAcquisitionType] = useState<VehicleAcquisitionType>(
@@ -124,49 +127,39 @@ export default function NewVehiclePage() {
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  // Available models & years based on selections
-  const availableModels = MODELS_BY_BRAND[selectedBrandCode] || [];
-  const availableYears = YEARS_BY_MODEL[selectedModelCode] || [
-    { codigo: "2023-1", nome: "2023 Flex", preco: 110000, codigoFipe: "001122-3" },
-    { codigo: "2022-1", nome: "2022 Flex", preco: 98000, codigoFipe: "001122-3" },
-  ];
+  useEffect(() => { fetch("/api/v1/fipe/marcas").then(r => r.ok ? r.json() : []).then(setBrands).catch(() => setBrands([])); }, []);
+  useEffect(() => { if (!selectedBrandCode) return; fetch(`/api/v1/fipe/marcas/${selectedBrandCode}/modelos`).then(r => r.ok ? r.json() : { modelos: [] }).then(data => { setModels(data.modelos || []); setSelectedModelCode(""); setYears([]); setSelectedYearCode(""); }).catch(() => setModels([])); }, [selectedBrandCode]);
+  useEffect(() => { if (!selectedBrandCode || !selectedModelCode) return; fetch(`/api/v1/fipe/marcas/${selectedBrandCode}/modelos/${selectedModelCode}/anos`).then(r => r.ok ? r.json() : []).then(data => { setYears(data); setSelectedYearCode(""); }).catch(() => setYears([])); }, [selectedBrandCode, selectedModelCode]);
+  useEffect(() => { if (!selectedBrandCode || !selectedModelCode || !selectedYearCode) return; fetch(`/api/v1/fipe/marcas/${selectedBrandCode}/modelos/${selectedModelCode}/anos/${selectedYearCode}`).then(r => r.ok ? r.json() : null).then(data => { if (!data) return; setFipePrice(Number(data.valorNumerico || 0)); setFipeCode(data.CodigoFipe || ""); setBrandName(data.Marca || brandName); setModelName(data.Modelo || modelName); setVersionName(""); setYearModel(Number(data.AnoModelo) || yearModel); setYearManufacture(Number(data.AnoModelo) || yearManufacture); }).catch(() => undefined); }, [selectedBrandCode, selectedModelCode, selectedYearCode]);
+
+  const availableModels = models;
+  const availableYears = years;
 
   // Handle Brand Change
   const handleBrandChange = (brandCode: string) => {
     setSelectedBrandCode(brandCode);
-    const b = POPULAR_BRANDS.find((x) => x.codigo === brandCode);
+    const b = brands.find((x) => x.codigo === brandCode);
     if (b) setBrandName(b.nome);
-
-    const models = MODELS_BY_BRAND[brandCode] || [];
-    if (models.length > 0) {
-      handleModelChange(models[0].codigo);
-    }
   };
 
   // Handle Model Change
   const handleModelChange = (modelCode: string) => {
     setSelectedModelCode(modelCode);
-    const m = (MODELS_BY_BRAND[selectedBrandCode] || []).find((x) => x.codigo === modelCode);
+    const m = models.find((x) => String(x.codigo) === modelCode);
     if (m) {
       const parts = m.nome.split(" ");
       setModelName(parts[0]);
       setVersionName(parts.slice(1).join(" "));
     }
 
-    const years = YEARS_BY_MODEL[modelCode] || [];
-    if (years.length > 0) {
-      handleYearChange(years[0].codigo, years[0]);
-    }
   };
 
   // Handle Year Change
-  const handleYearChange = (yearCode: string, yearObj?: any) => {
+  const handleYearChange = (yearCode: string) => {
     setSelectedYearCode(yearCode);
-    const yr = yearObj || availableYears.find((x) => x.codigo === yearCode);
+    const yr = availableYears.find((x) => x.codigo === yearCode);
     if (yr) {
-      setFipePrice(yr.preco);
-      setFipeCode(yr.codigoFipe);
-      const parsedYear = parseInt(yr.nome.slice(0, 4)) || 2022;
+      const parsedYear = parseInt(yr.nome.slice(0, 4)) || new Date().getFullYear();
       setYearModel(parsedYear);
       setYearManufacture(parsedYear - 1);
     }
@@ -265,7 +258,7 @@ export default function NewVehiclePage() {
                   onChange={(e) => handleBrandChange(e.target.value)}
                   className="flex h-9 w-full rounded-lg border border-zinc-700 bg-zinc-950/80 px-3 py-1 text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  {POPULAR_BRANDS.map((b) => (
+                  {brands.map((b) => (
                     <option key={b.codigo} value={b.codigo}>
                       {b.nome}
                     </option>

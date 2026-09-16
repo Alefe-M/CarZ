@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ExpenseService } from "@/lib/services/expense.service";
 import { CreateVehicleExpenseSchema } from "@/lib/validations/expense.schema";
+import { authorizeGarageRequest, errorStatus, getRequestUserId } from "@/lib/authorization";
+import { GarageRole } from "@prisma/client";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { garageId: string } }
 ) {
   try {
+    await authorizeGarageRequest(request, params.garageId, GarageRole.MECANICO);
     const body = await request.json();
     const validatedData = CreateVehicleExpenseSchema.parse(body);
 
-    const userId = request.headers.get("x-user-id") || "00000000-0000-0000-0000-000000000001";
+    const userId = await getRequestUserId(request);
 
     const expense = await ExpenseService.createVehicleExpense(
       params.garageId,
@@ -22,7 +25,7 @@ export async function POST(
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao lançar despesa no veículo", details: error.errors },
-      { status: 400 }
+      { status: errorStatus(error) }
     );
   }
 }

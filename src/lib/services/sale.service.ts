@@ -27,6 +27,17 @@ export class SaleService {
       if (vehicle.status === VehicleStatus.VENDIDO) {
         throw new Error("Este veículo já foi vendido anteriormente.");
       }
+      if (vehicle.status !== VehicleStatus.A_VENDA) {
+        throw new Error("A venda só pode ser concluída para veículos disponíveis à venda.");
+      }
+
+      const customer = await tx.customer.findFirst({
+        where: { id: input.customerId, garageId },
+        select: { id: true },
+      });
+      if (!customer) {
+        throw new Error("Cliente não encontrado nesta garagem.");
+      }
 
       // 2. Calcula o custo direto acumulado total até o fechamento da venda
       const totalAccumulatedCost = calculateDirectCost(

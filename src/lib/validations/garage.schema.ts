@@ -6,7 +6,6 @@ export const GarageRoleEnum = z.enum([
   "GERENTE",
   "VENDEDOR",
   "MECANICO",
-  "ESTOQUISTA",
   "VIEWER",
 ]);
 

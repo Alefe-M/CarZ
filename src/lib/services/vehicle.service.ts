@@ -7,6 +7,7 @@ import {
   calculateFipeDiscount,
 } from "../calculations";
 import Decimal from "decimal.js";
+import { assertVehicleStatusTransition } from "../vehicle-lifecycle";
 
 export class VehicleService {
   /**
@@ -196,6 +197,8 @@ export class VehicleService {
     if (!vehicle) {
       throw new Error("Veículo não encontrado.");
     }
+
+    assertVehicleStatusTransition(vehicle.status, newStatus);
 
     return prisma.vehicle.update({
       where: { id: vehicleId },

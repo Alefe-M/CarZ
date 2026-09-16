@@ -19,6 +19,7 @@ Bem-vindo à especificação técnica e de negócio do **CarZ**, sistema web mul
 | [08-fipe-integration.md](./08-fipe-integration.md) | Especificação completa da integração com a **FipeAPI / Parallelum API** (Marcas, Modelos, Anos, Valores de mercado e Caching). |
 | [09-ui-design-prompts-stitch.md](./09-ui-design-prompts-stitch.md) | Guia completo de **Prompts para o Stitch** (Web Desktop 1440px e Mobile 390px) cobrindo todas as telas e fluxos. |
 | [10-docker-compose-spec.md](./10-docker-compose-spec.md) | Especificação do ambiente **Docker Compose** (PostgreSQL 16 Alpine + pgAdmin 4 + Healthchecks + Volumes). |
+| [11-frontend-data-integration.md](./11-frontend-data-integration.md) | Sessão HTTP-only, integração do dashboard com a API/Prisma e fluxo de clientes para venda. |
 
 ---
 

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { FipeService } from "@/lib/services/fipe.service";
 
+// FIPE is an external, cached runtime dependency; never contact it while building.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const brands = await FipeService.getBrands();

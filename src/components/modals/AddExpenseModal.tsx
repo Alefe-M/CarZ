@@ -48,13 +48,13 @@ export function AddExpenseModal({
   const numOther = Number(otherCost) || 0;
   const totalAmount = numParts + numLabor + numOther;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVehicleId || !description || totalAmount <= 0) return;
 
     setSubmitting(true);
     try {
-      addVehicleExpense(selectedVehicleId, {
+      await addVehicleExpense(selectedVehicleId, {
         category,
         description,
         partsCost: numParts,

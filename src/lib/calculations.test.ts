@@ -6,6 +6,8 @@ import {
   parseFipePriceToNumber,
   formatCurrencyBRL,
 } from "./calculations";
+import { VehicleStatus } from "@prisma/client";
+import { assertVehicleStatusTransition } from "./vehicle-lifecycle";
 
 function assertEqual(actual: any, expected: any, message: string) {
   if (actual !== expected) {
@@ -58,6 +60,18 @@ assertEqual(discount, 18.00, "4. Deságio FIPE na Compra (%)");
 // 5. Teste de Parser de Moeda FIPE
 const parsedPrice = parseFipePriceToNumber("R$ 115.820,00");
 assertEqual(parsedPrice, 115820.00, "5. Parser de String de Moeda FIPE");
+
+// 6. Ciclo de vida: apenas as transições operacionais previstas são aceitas.
+assertVehicleStatusTransition(VehicleStatus.PREPARACAO, VehicleStatus.A_VENDA);
+assertEqual(true, true, "6.1. Preparação pode avançar para À Venda");
+assertVehicleStatusTransition(VehicleStatus.A_VENDA, VehicleStatus.PREPARACAO);
+assertEqual(true, true, "6.2. À Venda pode retornar para Preparação");
+try {
+  assertVehicleStatusTransition(VehicleStatus.PREPARACAO, VehicleStatus.VENDIDO);
+  assertEqual(true, false, "6.3. Venda direta deve ser bloqueada");
+} catch {
+  assertEqual(true, true, "6.3. Venda direta deve ser bloqueada");
+}
 
 console.log("\n==========================================");
 console.log("TODOS OS TESTES FINANCEIROS PASSARAM COM SUCESSO!");

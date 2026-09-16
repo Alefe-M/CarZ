@@ -4,6 +4,7 @@ import {
   CreateGeneralExpenseInput,
 } from "../validations/expense.schema";
 import Decimal from "decimal.js";
+import { VehicleStatus } from "@prisma/client";
 
 export class ExpenseService {
   /**
@@ -20,6 +21,9 @@ export class ExpenseService {
 
     if (!vehicle) {
       throw new Error("Veículo não encontrado nesta garagem.");
+    }
+    if (vehicle.status !== VehicleStatus.PREPARACAO) {
+      throw new Error("Só é possível lançar gastos em veículos em preparação.");
     }
 
     const partsCost = new Decimal(input.partsCost || 0);

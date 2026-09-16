@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { CreateGarageSchema } from "@/lib/validations/garage.schema";
 import { GarageRole } from "@prisma/client";
+import { getRequestUserId, errorStatus } from "@/lib/authorization";
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.headers.get("x-user-id") || "00000000-0000-0000-0000-000000000001";
+    const userId = await getRequestUserId(request);
 
     const memberships = await prisma.garageMember.findMany({
       where: { userId },
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao listar garagens" },
-      { status: 500 }
+      { status: errorStatus(error) }
     );
   }
 }
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const validatedData = CreateGarageSchema.parse(body);
-    const userId = request.headers.get("x-user-id") || "00000000-0000-0000-0000-000000000001";
+    const userId = await getRequestUserId(request);
 
     // Cria a garagem e adiciona o criador como OWNER
     const garage = await prisma.$transaction(async (tx) => {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Erro ao criar garagem", details: error.errors },
-      { status: 400 }
+      { status: errorStatus(error) }
     );
   }
 }

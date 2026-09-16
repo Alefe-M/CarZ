@@ -38,6 +38,15 @@ export const CreateVehicleExpenseSchema = z
     receiptFileUrl: z.string().optional(),
     notes: z.string().optional(),
   })
+  .superRefine((data, ctx) => {
+    if (data.amount !== undefined && data.amount < data.partsCost + data.laborCost) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: "O total não pode ser menor que peças mais mão de obra.",
+      });
+    }
+  })
   .transform((data) => {
     // Se o amount não for informado explicitamente, calcula como partsCost + laborCost
     const calculatedAmount =
