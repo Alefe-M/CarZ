@@ -91,25 +91,44 @@ export class SaleService {
       if (input.tradeInVehicle && tradeInValue > 0) {
         const tradeIn = input.tradeInVehicle;
 
+        // Normaliza a placa para no máximo 7 caracteres
+        const cleanPlate = (tradeIn.plate || "TROCA01")
+          .replace(/[^a-zA-Z0-9]/g, "")
+          .toUpperCase()
+          .slice(0, 7)
+          .padEnd(7, "0");
+
+        // Gera VIN fictício com exatamente 17 caracteres (limite do db.VarChar(17))
+        const timestampStr = Date.now().toString();
+        const cleanVin = tradeIn.vin
+          ? tradeIn.vin.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 17).padEnd(17, "0")
+          : `TRC${timestampStr.slice(-14)}`; // 3 + 14 = 17 caracteres
+
+        // Renavam com no máximo 11 caracteres (limite do db.VarChar(11))
+        const cleanRenavam = tradeIn.renavam
+          ? tradeIn.renavam.replace(/[^0-9]/g, "").slice(0, 11).padEnd(11, "0")
+          : "00000000000";
+
         await tx.vehicle.create({
           data: {
             garageId,
-            plate: tradeIn.plate,
-            vin: tradeIn.vin || `TROCA-${Date.now()}`,
-            renavam: tradeIn.renavam || "00000000000",
+            plate: cleanPlate,
+            vin: cleanVin,
+            renavam: cleanRenavam,
             brand: tradeIn.brand,
             model: tradeIn.model,
+            version: tradeIn.notes || undefined,
             yearManufacture: tradeIn.yearManufacture || tradeIn.yearModel,
             yearModel: tradeIn.yearModel,
-            color: tradeIn.color,
-            mileageIn: tradeIn.mileageIn,
-            mileageCurrent: tradeIn.mileageIn,
+            color: tradeIn.color || "Prata",
+            mileageIn: tradeIn.mileageIn || 0,
+            mileageCurrent: tradeIn.mileageIn || 0,
             status: VehicleStatus.PREPARACAO, // Novo carro entra direto na 1ª Etapa
             acquisitionType: VehicleAcquisitionType.TROCA_TRADE_IN,
             acquisitionDate: new Date(input.saleDate),
             acquisitionPrice: new Decimal(tradeIn.agreedTradeValue),
             tradeInFromSaleId: sale.id, // Vínculo com a venda de origem
-            notes: `Veículo recebido na troca na venda do ${vehicle.brand} ${vehicle.model} (${vehicle.plate}). ${tradeIn.notes || ""}`,
+            notes: `Veículo recebido na troca na venda do ${vehicle.brand} ${vehicle.model} (${vehicle.plate}). ${tradeIn.notes || ""}`.trim(),
           },
         });
       }

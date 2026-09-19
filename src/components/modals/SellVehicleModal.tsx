@@ -86,7 +86,7 @@ export function SellVehicleModal({
               version: tradeInVersion || "Versão Troca",
               yearManufacture: Number(tradeInYear),
               yearModel: Number(tradeInYear),
-              plate: tradeInPlate || "TRC-9999",
+              plate: (tradeInPlate || "TRC9999").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 7),
               color: "Prata",
               mileage: 50000,
               agreedValue: Number(tradeInAgreedValue) || 0,
